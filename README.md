@@ -1,102 +1,85 @@
-# NutriNest - Smart Meal Planner App
+# MyMeal - AI-Powered Meal Planning App
 
-NutriNest is a comprehensive meal planning and nutrition tracking application built with Expo React Native and Firebase. The app helps users plan their meals according to their dietary preferences, fitness goals, and budget.
+MyMeal is a React Native mobile application that helps users plan their meals using the Google Gemini AI API. The app provides personalized meal suggestions based on user preferences, dietary restrictions, and budget constraints.
 
 ## Features
 
-- **User Authentication**: Email/password signup and login using Firebase Authentication
-- **User Profile Management**: Set dietary preferences, fitness goals, allergies, and meal types
-- **Personalized Meal Plans**: Generate meal plans based on user preferences using Spoonacular API
-- **Nutrition Tracking**: Display calories, protein, carbs, and fats for meals
-- **Calorie & Macronutrient Visualization**: Track daily intake with interactive charts
-- **Meal Reminders**: Set notifications for meal times and grocery shopping
-- **Budget-Friendly Meal Options**: Filter meals by cost to find affordable options
+- AI-powered meal planning using Google Gemini API
+- Personalized meal suggestions based on user preferences
+- Support for dietary restrictions and allergies
+- Budget tracking and analysis
+- Dark/Light mode support
+- Meal history and search functionality
+- Weekly meal planning
+- Nutrition information tracking
+
+## Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+- Expo CLI
+- Google Gemini API key
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/my-meal.git
+cd my-meal
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Create a `.env` file in the root directory and add your Google Gemini API key:
+```
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+4. Start the development server:
+```bash
+npm start
+# or
+yarn start
+```
 
 ## Project Structure
 
 ```
-nutrinest/
-├── app/                  # Main application screens (Expo Router)
-│   ├── (auth)/           # Authentication screens
-│   ├── (tabs)/           # Main app tab screens
-│   ├── _layout.tsx       # Root layout & auth state handling
-│   └── profile-setup.tsx # User profile setup
-├── assets/               # Images, fonts, and other static assets
-├── components/           # Reusable UI components
-├── config/               # Configuration files
-│   └── firebaseConfig.js # Firebase configuration
-├── constants/            # App constants and theme settings
-├── hooks/                # Custom React hooks
-├── services/             # API and business logic
-│   ├── authService.js           # Authentication functions
-│   ├── mealPlannerService.js    # Meal planning logic
-│   ├── notificationService.js   # Notification handling
-│   ├── nutritionTrackerService.js # Nutrition tracking
-│   ├── spoonacularService.js    # Spoonacular API integration
-│   └── userProfileService.js    # User profile management
+my-meal/
+├── app/                 # Expo Router app directory
+├── assets/             # Static assets (images, fonts)
+├── components/         # Reusable React components
+├── context/           # React Context providers
+├── services/          # API and service integrations
+├── screens/           # Screen components
+├── app.config.js      # Expo configuration
+├── package.json       # Project dependencies
+└── README.md          # Project documentation
 ```
 
-## Setup Instructions
+## Environment Variables
 
-### Prerequisites
+- `EXPO_PUBLIC_GEMINI_API_KEY`: Your Google Gemini API key
 
-- Node.js (v14 or later)
-- Expo CLI
-- Firebase account
-- Spoonacular API key
+## Contributing
 
-### Installation
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/nutrinest.git
-   cd nutrinest
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Configure Firebase:
-   - Create a Firebase project in the Firebase Console
-   - Enable Authentication with Email/Password
-   - Create a Firestore database
-   - Copy your Firebase config to `config/firebaseConfig.js`
-
-4. Configure Spoonacular API:
-   - Get an API key from [Spoonacular](https://spoonacular.com/food-api)
-   - Update the API key in `services/spoonacularService.js`
-
-5. Start the development server:
-   ```
-   npx expo start
-   ```
-
-## Running on Mobile
-
-1. Install the Expo Go app on your mobile device
-2. Scan the QR code from the terminal or Expo Dev Tools
-3. The app will load on your device
-
-## Building for Production
-
-To create a production build:
-
-```
-eas build --platform ios
-eas build --platform android
-```
-
-## Dependencies
-
-- Expo SDK
-- React Native
-- Firebase (Auth & Firestore)
-- React Native Paper (UI Components)
-- React Native Chart Kit (Charts)
-- Expo Notifications (Reminders)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Google Gemini AI API
+- Expo
+- React Native community

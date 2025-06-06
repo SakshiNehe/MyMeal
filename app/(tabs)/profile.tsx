@@ -1,41 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
-import { Text, Card, Avatar, Switch, Button, IconButton, useTheme } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, Alert } from 'react-native';
+import { Text, Card, Button, Switch, List, Avatar, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { auth } from '../../config/firebaseConfig';
-import { signOut } from 'firebase/auth';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+
+import { auth } from '../../config/firebaseConfig';
+import { getUserProfile } from '../../services/userProfileService';
+import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/components/ThemedText';
+
+interface UserProfile {
+  name: string;
+  email: string;
+  preferences: {
+    dietaryPreferences: string[];
+    allergies: string[];
+    fitnessGoal: string;
+    targetCalories: number;
+  };
+}
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const theme = useTheme();
-  const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   useEffect(() => {
-    loadUserProfile();
+    const fetchUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const profile = await getUserProfile(user.uid);
+          setUserProfile(profile);
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Failed to load profile data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
   }, []);
 
-  const loadUserProfile = async () => {
+  const handleLogout = async () => {
     try {
-      const profileData = await AsyncStorage.getItem('userProfile');
-      if (profileData) {
-        setUserProfile(JSON.parse(profileData));
-      }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      router.replace('/(auth)/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
+      await auth.signOut();
+      router.replace('/login');
+    } catch (err) {
+      console.error('Error signing out:', err);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
   };
 
@@ -43,149 +62,244 @@ export default function ProfileScreen() {
     router.push('/profile-setup');
   };
 
-  const toggleNotifications = () => {
-    setNotifications(!notifications);
-  };
+  const renderUserStats = () => (
+    <View style={styles.statsContainer}>
+      <Card style={styles.statsCard}>
+        <Card.Content>
+          <Text style={styles.statsTitle}>Daily Stats</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>1,200</Text>
+              <Text style={styles.statLabel}>Calories</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>45g</Text>
+              <Text style={styles.statLabel}>Protein</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>150g</Text>
+              <Text style={styles.statLabel}>Carbs</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>35g</Text>
+              <Text style={styles.statLabel}>Fat</Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+    </View>
+  );
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ThemedView style={styles.loadingContainer}>
+          <Text>Loading profile...</Text>
+        </ThemedView>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ThemedView style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button mode="contained" onPress={() => router.replace('/login')}>
+            Return to Login
+          </Button>
+        </ThemedView>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
-        <View style={styles.header}>
-          <Avatar.Icon 
-            size={80} 
-            icon="account"
-            style={[styles.avatar, { backgroundColor: theme.colors.primary }]}
-          />
-          <View style={styles.headerInfo}>
-            <Text style={styles.name}>{auth.currentUser?.displayName || 'User'}</Text>
-            <Text style={styles.email}>{auth.currentUser?.email}</Text>
+    <SafeAreaView style={styles.container}>
+      <ThemedView style={styles.content}>
+        <ScrollView>
+          {/* Profile Header */}
+          <View style={styles.profileHeader}>
+            <Avatar.Text 
+              size={80} 
+              label={userProfile?.name?.charAt(0) || 'U'} 
+              style={styles.avatar}
+            />
+            <Text style={styles.userName}>{userProfile?.name || 'User'}</Text>
+            <Text style={styles.userEmail}>{userProfile?.email || 'user@example.com'}</Text>
+            <Button 
+              mode="outlined" 
+              onPress={handleEditProfile}
+              style={styles.editButton}
+            >
+              Edit Profile
+            </Button>
           </View>
-          <IconButton
-            icon="pencil"
-            size={24}
-            onPress={handleEditProfile}
-            style={styles.editButton}
-          />
-        </View>
 
-        {/* Stats Card */}
-        {userProfile && (
-          <Card style={styles.card}>
-            <Card.Title title="Your Stats" />
-            <Card.Content style={styles.statsContainer}>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{userProfile.height || '--'}</Text>
-                <Text style={styles.statLabel}>Height (cm)</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{userProfile.weight || '--'}</Text>
-                <Text style={styles.statLabel}>Weight (kg)</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statValue}>{userProfile.age || '--'}</Text>
-                <Text style={styles.statLabel}>Age</Text>
-              </View>
+          {/* User Stats */}
+          {renderUserStats()}
+
+          {/* Preferences Section */}
+          <Card style={styles.sectionCard}>
+            <Card.Content>
+              <Text style={styles.sectionTitle}>Preferences</Text>
+              
+              <List.Item
+                title="Dietary Preferences"
+                description={userProfile?.preferences?.dietaryPreferences?.join(', ') || 'Not set'}
+                left={props => <List.Icon {...props} icon="food" />}
+              />
+              
+              <List.Item
+                title="Allergies"
+                description={userProfile?.preferences?.allergies?.join(', ') || 'None'}
+                left={props => <List.Icon {...props} icon="alert" />}
+              />
+              
+              <List.Item
+                title="Fitness Goal"
+                description={userProfile?.preferences?.fitnessGoal || 'Not set'}
+                left={props => <List.Icon {...props} icon="run" />}
+              />
+              
+              <List.Item
+                title="Target Calories"
+                description={`${userProfile?.preferences?.targetCalories || 0} kcal/day`}
+                left={props => <List.Icon {...props} icon="fire" />}
+              />
             </Card.Content>
           </Card>
-        )}
 
-        {/* Settings Card */}
-        <Card style={styles.card}>
-          <Card.Title title="Settings" />
-          <Card.Content>
-            <View style={styles.settingItem}>
-              <Text>Push Notifications</Text>
-              <Switch value={notifications} onValueChange={toggleNotifications} />
-            </View>
-            <View style={styles.settingItem}>
-              <Text>Dark Mode</Text>
-              <Switch value={darkMode} onValueChange={toggleDarkMode} />
-            </View>
-          </Card.Content>
-        </Card>
+          {/* Settings Section */}
+          <Card style={styles.sectionCard}>
+            <Card.Content>
+              <Text style={styles.sectionTitle}>Settings</Text>
+              
+              <List.Item
+                title="Notifications"
+                description="Receive meal reminders and updates"
+                left={props => <List.Icon {...props} icon="bell" />}
+                right={props => (
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                  />
+                )}
+              />
+              
+              <List.Item
+                title="Dark Mode"
+                description="Toggle dark theme"
+                left={props => <List.Icon {...props} icon="theme-light-dark" />}
+                right={props => (
+                  <Switch
+                    value={darkModeEnabled}
+                    onValueChange={setDarkModeEnabled}
+                  />
+                )}
+              />
+            </Card.Content>
+          </Card>
 
-        {/* Sign Out Button */}
-        <Button 
-          mode="outlined" 
-          onPress={handleSignOut}
-          style={styles.signOutButton}
-          icon="logout"
-        >
-          Sign Out
-        </Button>
-      </ScrollView>
+          {/* Logout Button */}
+          <Button 
+            mode="contained" 
+            onPress={handleLogout}
+            style={styles.logoutButton}
+            icon="logout"
+          >
+            Logout
+          </Button>
+        </ScrollView>
+      </ThemedView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: '#fff',
   },
-  container: {
+  content: {
     flex: 1,
     padding: 16,
   },
-  header: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    color: '#E53935',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  profileHeader: {
     alignItems: 'center',
     marginBottom: 24,
-    paddingHorizontal: 8,
   },
   avatar: {
-    marginRight: 16,
+    backgroundColor: '#E53935',
+    marginBottom: 16,
   },
-  headerInfo: {
-    flex: 1,
-  },
-  name: {
+  userName: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 4,
   },
-  email: {
-    fontSize: 14,
+  userEmail: {
+    fontSize: 16,
     color: '#666',
+    marginBottom: 16,
   },
   editButton: {
-    marginLeft: 8,
-  },
-  card: {
-    marginBottom: 16,
-    elevation: 2,
+    borderColor: '#E53935',
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
+    marginBottom: 24,
   },
-  stat: {
+  statsCard: {
+    backgroundColor: '#f5f5f5',
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#E53935',
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
     marginTop: 4,
   },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  sectionCard: {
+    marginBottom: 24,
   },
-  signOutButton: {
-    marginTop: 24,
-    marginBottom: 32,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  logoutButton: {
+    backgroundColor: '#E53935',
+    marginTop: 8,
+    marginBottom: 24,
   },
 }); 

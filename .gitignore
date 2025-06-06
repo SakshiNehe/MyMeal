@@ -58,3 +58,7 @@ android/local.properties
 android/*.iml
 
 app-example
+
+# Environment variables
+.env
+.env.*

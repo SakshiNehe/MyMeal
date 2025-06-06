@@ -15,7 +15,7 @@ interface UserPreferences {
   allergies: string[];
 }
 
-const RecipesScreen = () => {
+export default function RecipesScreen() {
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [recipes, setRecipes] = useState<MealItem[]>([]);
@@ -252,17 +252,15 @@ const RecipesScreen = () => {
         )}
         
         {/* Suggested ingredients */}
-        <View style={styles.suggestedIngredientsContainer}>
-          <Text style={styles.filtersTitle}>Suggested Ingredients:</Text>
+        <View style={styles.suggestedContainer}>
+          <Text style={styles.suggestedTitle}>Suggested Ingredients:</Text>
           <View style={styles.chipsContainer}>
             {suggestedIngredients.map(ingredient => (
-              <Chip 
+              <Chip
                 key={ingredient}
+                selected={selectedFilters.includes(ingredient)}
                 onPress={() => handleFilterSelect(ingredient)}
-                style={[
-                  styles.chip,
-                  selectedFilters.includes(ingredient) ? styles.selectedChip : {}
-                ]}
+                style={styles.suggestedChip}
                 textStyle={styles.chipText}
               >
                 {ingredient}
@@ -271,53 +269,49 @@ const RecipesScreen = () => {
           </View>
         </View>
         
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#E53935" />
-            <Text style={styles.loadingText}>Finding delicious recipes...</Text>
-          </View>
-        ) : (
-          <ScrollView style={styles.recipesContainer}>
-            {recipes.length > 0 ? (
-              recipes.map(recipe => renderRecipeCard(recipe))
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons name="restaurant-outline" size={64} color="#E0E0E0" />
-                <Text style={styles.emptyStateText}>
-                  Search for ingredients to discover delicious Indian recipes
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-        )}
-        
-        {/* Recipe details modal */}
-        {recipeModalVisible && renderRecipeDetails()}
+        {/* Recipe list */}
+        <View style={styles.recipesContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#E53935" />
+              <Text style={styles.loadingText}>Finding recipes...</Text>
+            </View>
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : recipes.length > 0 ? (
+            recipes.map(recipe => renderRecipeCard(recipe))
+          ) : (
+            <Text style={styles.emptyText}>No recipes found. Try searching with different ingredients.</Text>
+          )}
+        </View>
       </ThemedView>
+      
+      {/* Recipe details modal */}
+      {recipeModalVisible && renderRecipeDetails()}
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   content: {
     flex: 1,
     padding: 16,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#E53935',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 24,
+    textAlign: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -326,42 +320,42 @@ const styles = StyleSheet.create({
   searchBar: {
     flex: 1,
     marginRight: 8,
-    backgroundColor: '#f5f5f5',
   },
   searchButton: {
-    justifyContent: 'center',
     backgroundColor: '#E53935',
-  },
-  suggestedIngredientsContainer: {
-    marginBottom: 16,
   },
   selectedFiltersContainer: {
     marginBottom: 16,
   },
   filtersTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   chipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-  },
-  chip: {
-    margin: 4,
-    backgroundColor: '#f0f0f0',
+    gap: 8,
   },
   selectedChip: {
-    margin: 4,
-    backgroundColor: '#ffebee',
+    backgroundColor: '#E53935',
+  },
+  suggestedChip: {
+    backgroundColor: '#f5f5f5',
   },
   chipText: {
-    color: '#333',
+    color: '#fff',
   },
-  errorText: {
-    color: '#E53935',
-    marginBottom: 16,
-    textAlign: 'center',
+  suggestedContainer: {
+    marginBottom: 24,
+  },
+  suggestedTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  recipesContainer: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -373,12 +367,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  recipesContainer: {
-    flex: 1,
+  errorText: {
+    color: '#E53935',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 16,
   },
   recipeCard: {
     marginBottom: 16,
-    elevation: 2,
   },
   recipeTitle: {
     fontSize: 18,
@@ -397,12 +397,10 @@ const styles = StyleSheet.create({
   },
   macroItem: {
     alignItems: 'center',
-    width: '25%',
   },
   macroValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#E53935',
+    fontWeight: 'bold',
   },
   macroLabel: {
     fontSize: 12,
@@ -415,46 +413,43 @@ const styles = StyleSheet.create({
   viewButton: {
     backgroundColor: '#E53935',
   },
-  emptyStateContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-    padding: 20,
-  },
-  emptyStateText: {
-    textAlign: 'center',
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
   recipeDetailsContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'white',
-    padding: 16,
-    zIndex: 10,
+    backgroundColor: '#fff',
+    zIndex: 1000,
   },
   closeButton: {
-    alignSelf: 'flex-end',
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1001,
   },
   detailsTitle: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginTop: 48,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   detailsDescription: {
     fontSize: 16,
     color: '#666',
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   nutritionCard: {
     backgroundColor: '#f5f5f5',
-    borderRadius: 8,
     padding: 16,
     marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
   macrosGrid: {
     flexDirection: 'row',
@@ -462,26 +457,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   macroGridItem: {
-    width: '25%',
+    width: '48%',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
     alignItems: 'center',
-    marginTop: 8,
   },
   macroGridValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#E53935',
   },
   macroGridLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    marginTop: 4,
   },
   section: {
+    paddingHorizontal: 16,
     marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
   },
   prepTimeDetail: {
     fontSize: 16,
@@ -498,19 +492,17 @@ const styles = StyleSheet.create({
   },
   instructionItem: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   instructionNumber: {
-    backgroundColor: '#E53935',
-    color: 'white',
     width: 24,
     height: 24,
+    backgroundColor: '#E53935',
+    color: '#fff',
     borderRadius: 12,
     textAlign: 'center',
     lineHeight: 24,
     marginRight: 12,
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   instructionText: {
     flex: 1,
@@ -518,5 +510,3 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
-
-export default RecipesScreen;

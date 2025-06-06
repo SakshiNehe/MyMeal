@@ -16,89 +16,28 @@ const firebaseConfig = {
   measurementId: "G-FZHHVSN7ZW"
 };
 
-// Firebase instance variables
-let firebaseApp = null;
-let firebaseAuth = null;
-let firebaseDb = null;
+// Initialize Firebase
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Firebase in a more robust way
-const initializeFirebase = () => {
-  try {
-    console.log("Starting Firebase initialization...");
-    // Check if Firebase app is already initialized
-    if (getApps().length === 0) {
-      console.log("Initializing new Firebase app instance");
-      firebaseApp = initializeApp(firebaseConfig);
-    } else {
-      console.log("Firebase app already initialized, reusing existing instance");
-      firebaseApp = getApps()[0];
+// Initialize Auth with persistence
+const auth = Platform.OS === 'web' 
+  ? getAuth(app)
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+
+// Initialize Firestore
+const db = getFirestore(app);
+
+// Initialize Analytics if supported (web only)
+if (Platform.OS === 'web') {
+  isSupported().then(supported => {
+    if (supported) {
+      getAnalytics(app);
     }
+  });
+}
 
-    // Initialize Auth
-    if (!firebaseAuth) {
-      console.log("Initializing Firebase Auth");
-      if (Platform.OS === 'web') {
-        firebaseAuth = getAuth(firebaseApp);
-        console.log("Firebase Auth initialized for web");
-      } else {
-        firebaseAuth = initializeAuth(firebaseApp, {
-          persistence: getReactNativePersistence(AsyncStorage)
-        });
-        console.log("Firebase Auth initialized for React Native with AsyncStorage persistence");
-      }
-    } else {
-      console.log("Auth already initialized");
-    }
-
-    // Initialize Firestore
-    if (!firebaseDb) {
-      firebaseDb = getFirestore(firebaseApp);
-      console.log("Firestore initialized successfully");
-    }
-
-    // Initialize Analytics if supported
-    isSupported()
-      .then(supported => {
-        if (supported) {
-          const analytics = getAnalytics(firebaseApp);
-          console.log("Firebase Analytics initialized successfully");
-        } else {
-          console.log("Firebase Analytics not supported on this platform");
-        }
-      })
-      .catch(error => {
-        console.warn("Firebase Analytics initialization error:", error);
-      });
-
-    console.log("Firebase initialization complete");
-    return { 
-      app: firebaseApp, 
-      auth: firebaseAuth, 
-      db: firebaseDb 
-    };
-  } catch (error) {
-    console.error("Firebase initialization error:", error);
-    // Ensure we return valid objects even if initialization fails
-    return { 
-      app: firebaseApp || null, 
-      auth: firebaseAuth || null, 
-      db: firebaseDb || null 
-    };
-  }
-};
-
-// Initialize Firebase when this module is imported
-const firebase = initializeFirebase();
-
-// Helper to check if Firebase is initialized
-export const isFirebaseInitialized = () => {
-  return !!firebase.app && !!firebase.auth && !!firebase.db;
-};
-
-// Export the Firebase instances
-export const auth = firebase.auth;
-export const db = firebase.db;
-export default firebase.app;
-
-// Expose a method to reinitialize Firebase if needed
-export const reinitializeFirebase = initializeFirebase; 
+// Export initialized instances
+export { auth, db };
+export default app; 

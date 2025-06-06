@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { auth } from '../../config/firebaseConfig';
 import { getUserPreferences, getUserProfile } from '../../services/userProfileService';
-import { geminiService, type MealItem, type MealPlanResponse } from '../../services/geminiService';
+import { GeminiService, type MealItem, type MealPlanResponse } from '../../services/geminiService';
 import { trackMealIntake } from '../../services/aiMealService';
 
 const { width } = Dimensions.get('window');
@@ -28,6 +28,13 @@ interface UserPreferences {
   dislikes?: string[];
   cuisinePreferences?: string[];
   mealPrepTime?: 'quick' | 'medium' | 'any';
+}
+
+function getValidFitnessGoal(goal: string | undefined): "maintain" | "lose" | "gain" {
+  if (goal === "maintain" || goal === "lose" || goal === "gain") {
+    return goal;
+  }
+  return "maintain"; // default fallback
 }
 
 export default function MealPlannerScreen() {
@@ -121,14 +128,15 @@ export default function MealPlannerScreen() {
         return;
       }
 
+      const geminiService = GeminiService.getInstance();
       const generatedPlan = await geminiService.generateMealPlan({
         dietaryRestrictions: userPreferences.dietaryPreferences || [],
-        calorieGoal: userPreferences.targetCalories || 2000,
+        targetCalories: userPreferences.targetCalories || 2000,
         allergies: userPreferences.allergies || [],
-        fitnessGoal: userPreferences.fitnessGoal || 'maintain',
+        fitnessGoal: getValidFitnessGoal(userPreferences.fitnessGoal),
         likes: userPreferences.likes || [],
         dislikes: userPreferences.dislikes || [],
-        cuisinePreferences: userPreferences.cuisinePreferences || [],
+        cuisinePreference: userPreferences.cuisinePreferences || [],
         mealPrepTime: userPreferences.mealPrepTime || 'any'
       });
 
@@ -243,185 +251,172 @@ export default function MealPlannerScreen() {
       </ThemedView>
     );
   }
-  
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={{flexGrow: 1}}>
-        <ThemedView style={styles.container}>
-          <StatusBar style="dark" />
-          
-          {/* Date Navigation */}
-          <View style={styles.dateNav}>
-            <IconButton icon="chevron-left" onPress={() => handleDateChange(-1)} />
-            <Text style={styles.dateText}>
-              {selectedDate.toLocaleDateString('en-US', { 
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </Text>
-            <IconButton icon="chevron-right" onPress={() => handleDateChange(1)} />
-          </View>
 
-          {/* Generate Button */}
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* Date Navigation */}
+        <View style={styles.dateNavigation}>
+          <IconButton
+            icon="chevron-left"
+            size={24}
+            onPress={() => handleDateChange(-1)}
+          />
+          <Text style={styles.dateText}>
+            {selectedDate.toLocaleDateString('en-US', { 
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric'
+            })}
+          </Text>
+          <IconButton
+            icon="chevron-right"
+            size={24}
+            onPress={() => handleDateChange(1)}
+          />
+        </View>
+
+        {/* Generate Meal Plan Button */}
+        {!mealPlan && (
           <Button
             mode="contained"
             onPress={handleGenerateMealPlan}
             loading={generating}
-            style={styles.generateButton}
             disabled={generating}
+            style={styles.generateButton}
           >
-            {generating ? 'Generating Plan...' : 'Generate Meal Plan'}
+            {generating ? 'Generating...' : 'Generate Meal Plan'}
           </Button>
+        )}
 
-          {error && (
-            <Text style={styles.errorText}>{error}</Text>
-          )}
+        {/* Meal Sections */}
+        {mealPlan && (
+          <>
+            {renderMealSection('breakfast', 'Breakfast')}
+            {renderMealSection('lunch', 'Lunch')}
+            {renderMealSection('dinner', 'Dinner')}
+            {renderMealSection('snacks', 'Snacks')}
+          </>
+        )}
 
-          {/* Meal Sections */}
-          {renderMealSection('breakfast', 'Breakfast')}
-          {renderMealSection('lunch', 'Lunch')}
-          {renderMealSection('dinner', 'Dinner')}
-          {renderMealSection('snacks', 'Snacks')}
-
-          {/* Total Nutrition */}
-          {mealPlan?.totalNutrition && (
-            <Card style={styles.totalCard}>
-              <Card.Title 
-                title="Daily Totals"
-                left={(props) => <Ionicons name="nutrition-outline" size={24} color={theme.colors.primary} />}
-              />
-              <Card.Content>
-                <View style={styles.nutritionGrid}>
-                  <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{mealPlan.totalNutrition.calories}</Text>
-                    <Text style={styles.nutritionLabel}>Calories</Text>
-                  </View>
-                  <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{mealPlan.totalNutrition.protein}g</Text>
-                    <Text style={styles.nutritionLabel}>Protein</Text>
-                  </View>
-                  <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{mealPlan.totalNutrition.carbs}g</Text>
-                    <Text style={styles.nutritionLabel}>Carbs</Text>
-                  </View>
-                  <View style={styles.nutritionItem}>
-                    <Text style={styles.nutritionValue}>{mealPlan.totalNutrition.fat}g</Text>
-                    <Text style={styles.nutritionLabel}>Fat</Text>
-                  </View>
-                </View>
-              </Card.Content>
-            </Card>
-          )}
-
-          {/* Meal Details Modal */}
-          <Modal
-            visible={mealDetailsModalVisible}
-            onDismiss={() => setMealDetailsModalVisible(false)}
-            animationType="slide"
-          >
+        {/* Meal Details Modal */}
+        <Modal
+          visible={mealDetailsModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setMealDetailsModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <IconButton
-                icon="close"
-                style={styles.closeButton}
-                onPress={() => setMealDetailsModalVisible(false)}
-              />
               {selectedMeal && (
-                <ScrollView>
-                  <Text style={styles.modalTitle}>{selectedMeal.meal}</Text>
-                  <Text style={styles.modalDescription}>{selectedMeal.description}</Text>
+                <>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>{selectedMeal.meal}</Text>
+                    <IconButton
+                      icon="close"
+                      size={24}
+                      onPress={() => setMealDetailsModalVisible(false)}
+                    />
+                  </View>
                   
-                  <View style={styles.modalNutrition}>
-                    <View style={styles.nutritionGrid}>
-                      <View style={styles.nutritionItem}>
-                        <Text style={styles.nutritionValue}>{selectedMeal.calories}</Text>
-                        <Text style={styles.nutritionLabel}>Calories</Text>
-                      </View>
-                      <View style={styles.nutritionItem}>
-                        <Text style={styles.nutritionValue}>{selectedMeal.protein}g</Text>
-                        <Text style={styles.nutritionLabel}>Protein</Text>
-                      </View>
-                      <View style={styles.nutritionItem}>
-                        <Text style={styles.nutritionValue}>{selectedMeal.carbs}g</Text>
-                        <Text style={styles.nutritionLabel}>Carbs</Text>
-                      </View>
-                      <View style={styles.nutritionItem}>
-                        <Text style={styles.nutritionValue}>{selectedMeal.fat}g</Text>
-                        <Text style={styles.nutritionLabel}>Fat</Text>
+                  <ScrollView style={styles.modalScroll}>
+                    <Text style={styles.modalDescription}>{selectedMeal.description}</Text>
+                    
+                    <View style={styles.nutritionSection}>
+                      <Text style={styles.sectionTitle}>Nutrition Information</Text>
+                      <View style={styles.macrosGrid}>
+                        <View style={styles.macroItem}>
+                          <Text style={styles.macroValue}>{selectedMeal.calories}</Text>
+                          <Text style={styles.macroLabel}>Calories</Text>
+                        </View>
+                        <View style={styles.macroItem}>
+                          <Text style={styles.macroValue}>{selectedMeal.protein}g</Text>
+                          <Text style={styles.macroLabel}>Protein</Text>
+                        </View>
+                        <View style={styles.macroItem}>
+                          <Text style={styles.macroValue}>{selectedMeal.carbs}g</Text>
+                          <Text style={styles.macroLabel}>Carbs</Text>
+                        </View>
+                        <View style={styles.macroItem}>
+                          <Text style={styles.macroValue}>{selectedMeal.fat}g</Text>
+                          <Text style={styles.macroLabel}>Fat</Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-
-                  <List.Section>
-                    <List.Subheader>Ingredients</List.Subheader>
-                    {selectedMeal.ingredients.map((ingredient, index) => (
-                      <List.Item
-                        key={index}
-                        title={ingredient}
-                        left={props => <List.Icon {...props} icon="circle-small" />}
-                      />
-                    ))}
-                  </List.Section>
-
-                  <List.Section>
-                    <List.Subheader>Instructions</List.Subheader>
-                    {selectedMeal.instructions.map((instruction, index) => (
-                      <List.Item
-                        key={index}
-                        title={instruction}
-                        left={props => <Text style={styles.stepNumber}>{index + 1}.</Text>}
-                      />
-                    ))}
-                  </List.Section>
+                    
+                    <View style={styles.ingredientsSection}>
+                      <Text style={styles.sectionTitle}>Ingredients</Text>
+                      {selectedMeal.ingredients.map((ingredient, index) => (
+                        <View key={index} style={styles.ingredientItem}>
+                          <Ionicons name="checkmark-circle-outline" size={16} color="#E53935" />
+                          <Text style={styles.ingredientText}>{ingredient}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    
+                    <View style={styles.instructionsSection}>
+                      <Text style={styles.sectionTitle}>Instructions</Text>
+                      {selectedMeal.instructions.map((instruction, index) => (
+                        <View key={index} style={styles.instructionItem}>
+                          <Text style={styles.instructionNumber}>{index + 1}</Text>
+                          <Text style={styles.instructionText}>{instruction}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
                   
                   <Button
                     mode="contained"
                     onPress={handleMealDone}
-                    style={styles.doneButton}
+                    loading={mealConsumed}
                     disabled={mealConsumed}
+                    style={styles.doneButton}
                   >
-                    {mealConsumed ? "Meal Recorded ✓" : "Mark as Done"}
+                    {mealConsumed ? 'Meal Completed!' : 'Mark as Done'}
                   </Button>
-                </ScrollView>
+                </>
               )}
             </View>
-          </Modal>
-        </ThemedView>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 16,
   },
   centeredContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dateNav: {
+  dateNavigation: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   dateText: {
     fontSize: 18,
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
   generateButton: {
-    marginBottom: 16,
+    marginBottom: 20,
     backgroundColor: '#E53935',
-  },
-  errorText: {
-    color: '#E53935',
-    marginBottom: 16,
-    textAlign: 'center',
   },
   mealCard: {
     marginBottom: 16,
@@ -429,96 +424,136 @@ const styles = StyleSheet.create({
   mealItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 8,
   },
   mealInfo: {
     flex: 1,
-    marginRight: 8,
   },
   mealName: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: 'bold',
   },
   mealDescription: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginTop: 4,
   },
   mealMacros: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
   prepTime: {
     fontSize: 12,
-    color: '#666',
+    color: '#888',
     marginTop: 4,
-  },
-  emptyMealText: {
-    fontStyle: 'italic',
-    color: '#666',
   },
   divider: {
     height: 1,
     backgroundColor: '#eee',
     marginVertical: 8,
   },
-  totalCard: {
-    marginTop: 16,
+  emptyMealText: {
+    textAlign: 'center',
+    color: '#888',
+    padding: 16,
   },
-  nutritionGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  nutritionItem: {
-    alignItems: 'center',
-    width: '25%',
-  },
-  nutritionValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#E53935',
-  },
-  nutritionLabel: {
-    fontSize: 12,
-    color: '#666',
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '90%',
   },
-  closeButton: {
-    alignSelf: 'flex-end',
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  modalScroll: {
+    flex: 1,
   },
   modalDescription: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  modalNutrition: {
+  nutritionSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  macrosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  macroItem: {
+    width: '48%',
     backgroundColor: '#f5f5f5',
-    padding: 16,
+    padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 8,
+    alignItems: 'center',
   },
-  stepNumber: {
-    width: 24,
-    textAlign: 'center',
+  macroValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  macroLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  ingredientsSection: {
+    marginBottom: 20,
+  },
+  ingredientItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ingredientText: {
+    marginLeft: 8,
     fontSize: 16,
-    fontWeight: '500',
+  },
+  instructionsSection: {
+    marginBottom: 20,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  instructionNumber: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#E53935',
+    color: '#fff',
+    borderRadius: 12,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginRight: 12,
+  },
+  instructionText: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 24,
   },
   doneButton: {
-    marginVertical: 24,
-    paddingVertical: 8,
-    backgroundColor: '#4CAF50',
-  }
+    marginTop: 16,
+    backgroundColor: '#E53935',
+  },
 }); 

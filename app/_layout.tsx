@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, useRef } from 'react';
@@ -18,6 +18,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { auth, isFirebaseInitialized, reinitializeFirebase } from '../config/firebaseConfig';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { initializeNotifications } from '../services/notificationService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -168,9 +169,9 @@ const customTheme = {
 };
 
 export default function RootLayout() {
+  const { user, setUser } = useAuth();
   const colorScheme = useColorScheme();
   const [initializing, setInitializing] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -182,13 +183,29 @@ export default function RootLayout() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        if (!isFirebaseInitialized()) {
+        // Ensure Firebase is initialized
+        if (!isFirebaseInitialized) {
           await reinitializeFirebase();
         }
+
+        // Set up auth state listener
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (isMounted.current) {
+            setUser(user);
+            setInitializing(false);
+          }
+        });
+
+        // Initialize notifications
         await initializeNotifications();
+
+        // Clean up auth listener on unmount
+        return () => {
+          isMounted.current = false;
+          unsubscribe();
+        };
       } catch (error) {
         console.error('Error initializing app:', error);
-      } finally {
         setInitializing(false);
       }
     };
@@ -196,64 +213,26 @@ export default function RootLayout() {
     initializeApp();
   }, []);
 
-  // Handle auth state changes
+  // Handle auth state changes and routing
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setInitializing(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Handle routing based on authentication state
-  useEffect(() => {
-    // Mark component as mounted on first effect run
-    isMounted.current = true;
-    
-    // Don't attempt navigation until fully initialized and mounted
-    if (initializing || !loaded) {
-      console.log("Still initializing or loading fonts, delaying navigation");
-      return;
-    }
-
-    // Use a timeout to ensure navigation happens after rendering
-    const timer = setTimeout(() => {
-      if (!isMounted.current) return;
-
+    if (!initializing) {
       const inAuthGroup = segments[0] === '(auth)';
-      const inOnboarding = segments[0] === 'onboarding';
       
-      console.log(`Navigation check - User: ${!!user}, inAuthGroup: ${inAuthGroup}, inOnboarding: ${inOnboarding}`);
-
-      if (!user && !inAuthGroup && !inOnboarding) {
-        // If user is not signed in and not in auth group, redirect to onboarding
-        console.log("Redirecting to onboarding");
-        router.replace('/onboarding');
+      if (!user && !inAuthGroup) {
+        // Redirect to the sign-in page if not signed in
+        router.replace('/(auth)/login');
       } else if (user && inAuthGroup) {
-        // If user is signed in and in auth group, redirect to main app
-        console.log("User signed in, redirecting to main app");
+        // Redirect to the home page if signed in
         router.replace('/(tabs)');
       }
-    }, 250); // Increased timeout for more reliability
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [user, initializing, segments, loaded]);
+    }
+  }, [user, segments, initializing]);
 
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
-
-  // Cleanup function to set mounted state to false when component unmounts
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
 
   if (!loaded || initializing) {
     return null;
@@ -265,7 +244,11 @@ export default function RootLayout() {
         <View style={styles.container}>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           <View style={styles.content}>
-            <Slot />
+            <Stack>
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="profile-setup" options={{ headerShown: false }} />
+            </Stack>
           </View>
         </View>
       </ThemeProvider>
@@ -276,10 +259,8 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
-    padding: 16,
   },
 });
